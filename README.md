@@ -8,7 +8,7 @@ Cada tipo de dado fica no banco que combina com ele:
 |---|---|---|---|
 | Catálogo de livros | **MongoDB** (documentos) | esquema flexível vindo da Google Books, busca por texto e categoria | Mongoose |
 | Carrinho | **Redis** (chave-valor) | leitura/escrita rápida por usuário, expira sozinho | ioredis |
-| Usuários, estoque, pedidos | **PostgreSQL** (relacional) | transação ACID no checkout, integridade referencial | Prisma |
+| Usuários, pedidos, pagamento, estoque | **PostgreSQL** (relacional) | transação ACID no checkout, integridade referencial | Prisma |
 
 ## Rodando
 
@@ -124,7 +124,9 @@ Para erro de negócio, lance `new HttpError(status, 'mensagem')` de qualquer cam
 
 - **`livroId` é o volumeId da Google Books** e é o mesmo nos três bancos: `_id` do documento no MongoDB, chave primária de `estoque` no Postgres e campo do hash do carrinho no Redis. Não crie outro id para livro.
 - **Carrinho no Redis:** um hash por usuário, `carrinho:{usuarioId}` → `{ livroId: quantidade }`, com TTL de 7 dias renovado a cada escrita.
-- **Pedido guarda cópia** de título e preço no momento da compra (`itens_pedido`). Mudança de preço no catálogo não altera pedidos antigos.
+- **`item_pedido.preco_unitario` congela o preço** no momento da compra. Mudança de preço no catálogo não altera pedidos antigos. O título não é copiado: a API busca no MongoDB ao montar a resposta.
+- **`item_pedido.livro_id` não tem FK**: o livro vive no MongoDB, não é tabela do Postgres.
+- **Pagamento é 1:1 com pedido** e é simulado: o checkout já cria com status `APROVADO`. Os valores aceitos nos campos `status`/`metodo` (colunas `text`) estão em `backend/src/modules/pedidos/pedido.types.ts`.
 - **Estoque fica no Postgres**, não no MongoDB, para o checkout decrementar na mesma transação que cria o pedido. A tabela tem `CHECK (quantidade >= 0)`.
 
 ## Estado atual
@@ -137,12 +139,12 @@ Pronto e funcionando:
 - Middleware de JWT, tratamento de erros, validação de entrada
 - Todas as rotas da API registradas e validando entrada (ver [docs/api.md](docs/api.md))
 - Cliente HTTP do front com todos os endpoints tipados, contexto de autenticação e rotas protegidas
-- Script de ingestão da Google Books
 
 A fazer (cada item tem `TODO` com dica no próprio arquivo; enquanto não for feito, a rota responde **501**):
 
 | Parte | Arquivos | Responsável |
 |---|---|---|
+| Ingestão Google Books | `backend/src/scripts/ingest-google-books.ts` (grava livros no MongoDB e estoque no Postgres) | _(nome)_ |
 | Usuários / login | `backend/src/modules/usuarios/*` · `LoginPage`, `CadastroPage` | _(nome)_ |
 | Catálogo | `backend/src/modules/catalogo/*` · `CatalogoPage`, `LivroPage` | _(nome)_ |
 | Carrinho | `backend/src/modules/carrinho/*` · `CarrinhoPage` | _(nome)_ |

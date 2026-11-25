@@ -1,5 +1,15 @@
 import { api } from './client';
-import type { Carrinho, Health, LivroDetalhe, LivroResumo, Paginado, Pedido, Sessao, Usuario } from './types';
+import type {
+  Carrinho,
+  Health,
+  LivroDetalhe,
+  LivroResumo,
+  MetodoPagamento,
+  Paginado,
+  Pedido,
+  Sessao,
+  Usuario,
+} from './types';
 
 export const healthApi = {
   status: () => api<Health>('/health'),
@@ -31,7 +41,7 @@ export const carrinhoApi = {
 };
 
 export const pedidosApi = {
-  checkout: () => api<Pedido>('/pedidos', 'POST'),
+  checkout: (metodo: MetodoPagamento) => api<Pedido>('/pedidos', 'POST', { metodo }),
   listar: () => api<Pedido[]>('/pedidos'),
-  obter: (id: string) => api<Pedido>(`/pedidos/${encodeURIComponent(id)}`),
+  obter: (id: number) => api<Pedido>(`/pedidos/${id}`),
 };

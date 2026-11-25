@@ -1,8 +1,8 @@
-// PostgreSQL: dados críticos e transacionais (usuários, estoque, pedidos).
+// PostgreSQL: dados críticos e transacionais (usuários, pedidos, pagamento, estoque).
 // Catálogo fica no MongoDB e carrinho no Redis.
 //
-// Convenção de ID de livro: o mesmo `livroId` (volumeId da Google Books API)
-// é o _id no MongoDB, a chave do estoque aqui e o campo do carrinho no Redis.
+// Convenção de ID de livro: `livro_id` é o volumeId da Google Books API.
+// É o _id do documento no MongoDB, a chave do estoque aqui e o campo do carrinho no Redis.
 //
 // Mudou este arquivo? Rode:
 //   docker compose exec api npx prisma migrate dev --name descricao_da_mudanca
@@ -18,61 +18,68 @@ datasource db {
 }
 
 model Usuario {
-  id        String   @id @default(uuid())
+  id        Int      @id @default(autoincrement())
   nome      String
   email     String   @unique
   senhaHash String   @map("senha_hash")
-  criadoEm  DateTime @default(now()) @map("criado_em")
+  criadoEm  DateTime @default(now()) @map("criado_em") @db.Timestamptz(3)
 
   pedidos Pedido[]
 
-  @@map("usuarios")
+  @@map("usuario")
+}
+
+/// status: ver StatusPedido em src/modules/pedidos/pedido.types.ts
+model Pedido {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int      @map("usuario_id")
+  status    String
+  total     Decimal  @db.Decimal(10, 2)
+  criadoEm  DateTime @default(now()) @map("criado_em") @db.Timestamptz(3)
+
+  usuario   Usuario      @relation(fields: [usuarioId], references: [id])
+  itens     ItemPedido[]
+  pagamento Pagamento?
+
+  @@index([usuarioId, criadoEm])
+  @@map("pedido")
+}
+
+/// preco_unitario congela o preço na hora da compra.
+/// livro_id aponta para o documento no MongoDB (sem FK: o livro não é tabela daqui).
+model ItemPedido {
+  id            Int     @id @default(autoincrement())
+  pedidoId      Int     @map("pedido_id")
+  livroId       String  @map("livro_id")
+  precoUnitario Decimal @map("preco_unitario") @db.Decimal(10, 2)
+  quantidade    Int // CHECK (quantidade > 0) na migration
+
+  pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@index([pedidoId])
+  @@map("item_pedido")
+}
+
+/// 1:1 com pedido (pedido_id é UNIQUE).
+/// metodo/status: ver MetodoPagamento e StatusPagamento em src/modules/pedidos/pedido.types.ts
+model Pagamento {
+  id       Int     @id @default(autoincrement())
+  pedidoId Int     @unique @map("pedido_id")
+  metodo   String
+  valor    Decimal @db.Decimal(10, 2)
+  status   String
+
+  pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@map("pagamento")
 }
 
 /// Estoque por livro. Fica no relacional para o checkout decrementar
 /// dentro da mesma transação que cria o pedido.
 model Estoque {
   livroId      String   @id @map("livro_id")
-  quantidade   Int // CHECK (quantidade >= 0) adicionado na migration
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
-
-  itensPedido ItemPedido[]
+  quantidade   Int // CHECK (quantidade >= 0) na migration
+  atualizadoEm DateTime @updatedAt @map("atualizado_em") @db.Timestamptz(3)
 
   @@map("estoque")
-}
-
-enum StatusPedido {
-  CONFIRMADO
-  CANCELADO
-}
-
-model Pedido {
-  id        String       @id @default(uuid())
-  usuarioId String       @map("usuario_id")
-  status    StatusPedido @default(CONFIRMADO)
-  total     Decimal      @db.Decimal(10, 2)
-  criadoEm  DateTime     @default(now()) @map("criado_em")
-
-  usuario Usuario      @relation(fields: [usuarioId], references: [id])
-  itens   ItemPedido[]
-
-  @@index([usuarioId, criadoEm])
-  @@map("pedidos")
-}
-
-/// Título e preço são cópia (snapshot) do catálogo no momento da compra:
-/// se o preço mudar no MongoDB, o histórico do pedido não muda.
-model ItemPedido {
-  id            Int     @id @default(autoincrement())
-  pedidoId      String  @map("pedido_id")
-  livroId       String  @map("livro_id")
-  titulo        String
-  precoUnitario Decimal @map("preco_unitario") @db.Decimal(10, 2)
-  quantidade    Int
-
-  pedido  Pedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
-  estoque Estoque @relation(fields: [livroId], references: [livroId])
-
-  @@index([pedidoId])
-  @@map("itens_pedido")
 }

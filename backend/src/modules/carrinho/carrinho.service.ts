@@ -19,27 +19,27 @@ export interface Carrinho {
 
 export const CarrinhoService = {
   /** Lê o hash do Redis e enriquece com título/preço do MongoDB. */
-  async obter(usuarioId: string): Promise<Carrinho> {
+  async obter(usuarioId: number): Promise<Carrinho> {
     // TODO: CarrinhoRepository.obterItens + LivroRepository.buscarPorIds
     naoImplementado('CarrinhoService.obter');
   },
 
   /** 404 se o livro não existir; 409 se a quantidade pedida passar do estoque. */
-  async adicionarItem(usuarioId: string, livroId: string, quantidade: number): Promise<Carrinho> {
+  async adicionarItem(usuarioId: number, livroId: string, quantidade: number): Promise<Carrinho> {
     // TODO: validar livro (LivroRepository) e estoque (EstoqueRepository), depois CarrinhoRepository.incrementar
     naoImplementado('CarrinhoService.adicionarItem');
   },
 
-  async atualizarQuantidade(usuarioId: string, livroId: string, quantidade: number): Promise<Carrinho> {
+  async atualizarQuantidade(usuarioId: number, livroId: string, quantidade: number): Promise<Carrinho> {
     // TODO: quantidade 0 remove o item
     naoImplementado('CarrinhoService.atualizarQuantidade');
   },
 
-  async removerItem(usuarioId: string, livroId: string): Promise<Carrinho> {
+  async removerItem(usuarioId: number, livroId: string): Promise<Carrinho> {
     naoImplementado('CarrinhoService.removerItem');
   },
 
-  async limpar(usuarioId: string): Promise<void> {
+  async limpar(usuarioId: number): Promise<void> {
     naoImplementado('CarrinhoService.limpar');
   },
 };

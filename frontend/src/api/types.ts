@@ -42,24 +42,34 @@ export interface Carrinho {
   total: number;
 }
 
+export type MetodoPagamento = 'PIX' | 'CARTAO' | 'BOLETO';
+
 export interface ItemPedido {
-  id: number;
   livroId: string;
-  titulo: string;
-  precoUnitario: string; // Decimal do Prisma chega como string no JSON
+  titulo: string | null; // vem do MongoDB; null se o livro saiu do catálogo
+  capaUrl: string | null;
+  precoUnitario: number; // preço congelado na compra (Postgres)
   quantidade: number;
+  subtotal: number;
+}
+
+export interface Pagamento {
+  metodo: MetodoPagamento;
+  valor: number;
+  status: 'PENDENTE' | 'APROVADO' | 'RECUSADO';
 }
 
 export interface Pedido {
-  id: string;
+  id: number;
   status: 'CONFIRMADO' | 'CANCELADO';
-  total: string; // Decimal do Prisma chega como string no JSON
-  criadoEm: string;
+  total: number;
+  criadoEm: string; // ISO
   itens: ItemPedido[];
+  pagamento: Pagamento | null;
 }
 
 export interface Usuario {
-  id: string;
+  id: number;
   nome: string;
   email: string;
 }

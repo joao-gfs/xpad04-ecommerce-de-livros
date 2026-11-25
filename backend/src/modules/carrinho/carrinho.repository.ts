@@ -11,31 +11,31 @@ import { naoImplementado } from '../../shared/http-error';
  *   valor:  quantidade
  * com TTL de env.CARRINHO_TTL_SEGUNDOS renovado a cada escrita.
  */
-export const chaveCarrinho = (usuarioId: string) => `carrinho:${usuarioId}`;
+export const chaveCarrinho = (usuarioId: number) => `carrinho:${usuarioId}`;
 
 export const CarrinhoRepository = {
   /** livroId -> quantidade */
-  async obterItens(usuarioId: string): Promise<Map<string, number>> {
+  async obterItens(usuarioId: number): Promise<Map<string, number>> {
     // TODO: redis.hgetall(chaveCarrinho(usuarioId)) e converter valores para number
     naoImplementado('CarrinhoRepository.obterItens');
   },
 
-  async definirQuantidade(usuarioId: string, livroId: string, quantidade: number): Promise<void> {
+  async definirQuantidade(usuarioId: number, livroId: string, quantidade: number): Promise<void> {
     // TODO: redis.multi().hset(...).expire(chave, env.CARRINHO_TTL_SEGUNDOS).exec()
     naoImplementado('CarrinhoRepository.definirQuantidade');
   },
 
-  async incrementar(usuarioId: string, livroId: string, quantidade: number): Promise<number> {
+  async incrementar(usuarioId: number, livroId: string, quantidade: number): Promise<number> {
     // TODO: redis.hincrby(...) + expire; retorna a nova quantidade
     naoImplementado('CarrinhoRepository.incrementar');
   },
 
-  async removerItem(usuarioId: string, livroId: string): Promise<void> {
+  async removerItem(usuarioId: number, livroId: string): Promise<void> {
     // TODO: redis.hdel(...)
     naoImplementado('CarrinhoRepository.removerItem');
   },
 
-  async limpar(usuarioId: string): Promise<void> {
+  async limpar(usuarioId: number): Promise<void> {
     // TODO: redis.del(...)
     naoImplementado('CarrinhoRepository.limpar');
   },

@@ -13,7 +13,7 @@ export const UsuarioRepository = {
     naoImplementado('UsuarioRepository.buscarPorEmail');
   },
 
-  async buscarPorId(id: string): Promise<Usuario | null> {
+  async buscarPorId(id: number): Promise<Usuario | null> {
     naoImplementado('UsuarioRepository.buscarPorId');
   },
 };

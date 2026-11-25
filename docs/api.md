@@ -22,7 +22,7 @@ Os tipos de resposta estão em [`frontend/src/api/types.ts`](../frontend/src/api
 | POST | `/auth/login` | `{ email, senha }` | `Sessao` · 401 credenciais inválidas |
 | GET 🔒 | `/auth/me` | | `Usuario` |
 
-`Sessao = { token, usuario: { id, nome, email } }`
+`Sessao = { token, usuario: { id: number, nome, email } }`
 
 ## Catálogo (`modules/catalogo`, MongoDB + estoque do PostgreSQL)
 
@@ -44,10 +44,11 @@ Os tipos de resposta estão em [`frontend/src/api/types.ts`](../frontend/src/api
 
 ## Pedidos 🔒 (`modules/pedidos`, PostgreSQL)
 
-| Método | Rota | Resposta |
-|---|---|---|
-| POST | `/pedidos` | Checkout do carrinho atual. 201 `Pedido` · 400 carrinho vazio · 409 estoque insuficiente |
-| GET | `/pedidos` | `Pedido[]` do usuário, mais recente primeiro |
-| GET | `/pedidos/:id` | `Pedido` · 404 se não existir ou for de outro usuário |
+| Método | Rota | Corpo | Resposta |
+|---|---|---|---|
+| POST | `/pedidos` | `{ metodo: "PIX" \| "CARTAO" \| "BOLETO" }` | Checkout do carrinho atual: cria pedido, itens e pagamento (simulado, já `APROVADO`). 201 `Pedido` · 400 carrinho vazio · 409 estoque insuficiente |
+| GET | `/pedidos` | | `Pedido[]` do usuário, mais recente primeiro |
+| GET | `/pedidos/:id` | | `Pedido` · 404 se não existir ou for de outro usuário |
 
-`total` e `precoUnitario` de pedido vêm como **string** (são `Decimal` no Postgres).
+Valores monetários vêm como **number** (o service converte o `Decimal` do Prisma).
+`titulo` e `capaUrl` dos itens vêm do MongoDB (a tabela `item_pedido` só guarda `livro_id`, preço e quantidade).

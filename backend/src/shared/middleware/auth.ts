@@ -6,7 +6,7 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      usuarioId?: string;
+      usuarioId?: number;
     }
   }
 }
@@ -26,7 +26,7 @@ export function exigirAuth(req: Request, _res: Response, next: NextFunction) {
 }
 
 /** Use em controllers de rotas protegidas por exigirAuth. */
-export function usuarioIdDe(req: Request): string {
+export function usuarioIdDe(req: Request): number {
   if (!req.usuarioId) throw new HttpError(401, 'Não autenticado');
   return req.usuarioId;
 }

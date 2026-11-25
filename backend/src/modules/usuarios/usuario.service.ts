@@ -5,7 +5,7 @@ import { UsuarioRepository } from './usuario.repository';
 
 /** Nunca devolva senhaHash para o cliente. */
 export interface UsuarioPublico {
-  id: string;
+  id: number;
   nome: string;
   email: string;
 }
@@ -28,7 +28,7 @@ export const UsuarioService = {
     naoImplementado('UsuarioService.login');
   },
 
-  async obterPerfil(usuarioId: string): Promise<UsuarioPublico> {
+  async obterPerfil(usuarioId: number): Promise<UsuarioPublico> {
     naoImplementado('UsuarioService.obterPerfil');
   },
 };
