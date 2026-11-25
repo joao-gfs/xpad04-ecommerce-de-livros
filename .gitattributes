@@ -1,0 +1,5 @@
+# Garante LF nos scripts que rodam dentro do container (evita erro em quem clona no Windows)
+* text=auto eol=lf
+*.pdf binary
+*.png binary
+*.jpg binary

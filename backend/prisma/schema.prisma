@@ -1,0 +1,78 @@
+// PostgreSQL: dados críticos e transacionais (usuários, estoque, pedidos).
+// Catálogo fica no MongoDB e carrinho no Redis.
+//
+// Convenção de ID de livro: o mesmo `livroId` (volumeId da Google Books API)
+// é o _id no MongoDB, a chave do estoque aqui e o campo do carrinho no Redis.
+//
+// Mudou este arquivo? Rode:
+//   docker compose exec api npx prisma migrate dev --name descricao_da_mudanca
+// e commite a pasta prisma/migrations junto.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senhaHash String   @map("senha_hash")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  pedidos Pedido[]
+
+  @@map("usuarios")
+}
+
+/// Estoque por livro. Fica no relacional para o checkout decrementar
+/// dentro da mesma transação que cria o pedido.
+model Estoque {
+  livroId      String   @id @map("livro_id")
+  quantidade   Int // CHECK (quantidade >= 0) adicionado na migration
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  itensPedido ItemPedido[]
+
+  @@map("estoque")
+}
+
+enum StatusPedido {
+  CONFIRMADO
+  CANCELADO
+}
+
+model Pedido {
+  id        String       @id @default(uuid())
+  usuarioId String       @map("usuario_id")
+  status    StatusPedido @default(CONFIRMADO)
+  total     Decimal      @db.Decimal(10, 2)
+  criadoEm  DateTime     @default(now()) @map("criado_em")
+
+  usuario Usuario      @relation(fields: [usuarioId], references: [id])
+  itens   ItemPedido[]
+
+  @@index([usuarioId, criadoEm])
+  @@map("pedidos")
+}
+
+/// Título e preço são cópia (snapshot) do catálogo no momento da compra:
+/// se o preço mudar no MongoDB, o histórico do pedido não muda.
+model ItemPedido {
+  id            Int     @id @default(autoincrement())
+  pedidoId      String  @map("pedido_id")
+  livroId       String  @map("livro_id")
+  titulo        String
+  precoUnitario Decimal @map("preco_unitario") @db.Decimal(10, 2)
+  quantidade    Int
+
+  pedido  Pedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  estoque Estoque @relation(fields: [livroId], references: [livroId])
+
+  @@index([pedidoId])
+  @@map("itens_pedido")
+}
