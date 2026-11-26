@@ -38,6 +38,10 @@ export const CarrinhoService = {
     const livroMap = new Map(livros.map((l) => [String(l._id), l]));
 
     const itens: ItemCarrinho[] = [...mapa.entries()]
+      // Items whose book no longer exists in MongoDB are intentionally filtered out.
+      // This prevents checkout of inexistent items and guarantees all required fields
+      // (titulo, precoUnitario, subtotal) are always populated.
+      // The item remains in Redis until TTL expires; if the book is re-ingested it reappears.
       .filter(([livroId]) => livroMap.has(livroId)) // descarta itens cujo livro sumiu do catálogo
       .map(([livroId, quantidade]) => {
         const livro = livroMap.get(livroId)!;
