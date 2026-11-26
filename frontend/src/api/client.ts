@@ -1,4 +1,6 @@
-const TOKEN_KEY = 'livraria.token';
+import { demonstrarFluxos } from '../config/desenvolvimento';
+
+const TOKEN_KEY = demonstrarFluxos ? 'livraria.demo.token' : 'livraria.token';
 
 export const tokenStore = {
   get(): string | null {
@@ -48,7 +50,12 @@ export async function api<T>(caminho: string, metodo: Metodo = 'GET', corpo?: un
   });
 
   if (res.status === 204) return undefined as T;
+  if (!res.ok) {
+    const dados = await res.json().catch(() => null);
+    const mensagem = typeof dados?.erro === 'string' ? dados.erro : res.statusText;
+    throw new ApiError(res.status, mensagem);
+  }
   const dados = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, dados?.erro ?? res.statusText);
+  if (dados === null) throw new ApiError(502, 'A API retornou uma resposta inválida.');
   return dados as T;
 }
