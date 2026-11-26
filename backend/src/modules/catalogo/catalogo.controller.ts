@@ -2,12 +2,25 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { CatalogoService } from './catalogo.service';
 
-const listarQuery = z.object({
-  categoria: z.string().trim().min(1).optional(),
-  busca: z.string().trim().min(1).optional(),
-  pagina: z.coerce.number().int().min(1).default(1),
-  porPagina: z.coerce.number().int().min(1).max(100).default(20),
-});
+const texto = z.string().trim().min(1).optional();
+
+const listarQuery = z
+  .object({
+    categoria: texto,
+    autor: texto,
+    titulo: texto,
+    descricao: texto,
+    editora: texto,
+    busca: texto,
+    precoMin: z.coerce.number().min(0).optional(),
+    precoMax: z.coerce.number().min(0).optional(),
+    pagina: z.coerce.number().int().min(1).default(1),
+    porPagina: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .refine(
+    (f) => f.precoMin === undefined || f.precoMax === undefined || f.precoMin <= f.precoMax,
+    { message: 'precoMin não pode ser maior que precoMax', path: ['precoMin'] },
+  );
 
 export const CatalogoController = {
   async categorias(_req: Request, res: Response) {
