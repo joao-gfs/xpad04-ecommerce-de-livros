@@ -4,9 +4,12 @@ import { RotaProtegida } from './components/RotaProtegida';
 import { CadastroPage } from './pages/CadastroPage';
 import { CarrinhoPage } from './pages/CarrinhoPage';
 import { CatalogoPage } from './pages/CatalogoPage';
+import { CheckoutPage } from './pages/CheckoutPage';
 import { LivroPage } from './pages/LivroPage';
 import { LoginPage } from './pages/LoginPage';
 import { PedidosPage } from './pages/PedidosPage';
+import { PedidoDetalhePage } from './pages/PedidoDetalhePage';
+import { EstadoPagina } from './components/EstadoPagina';
 
 export function App() {
   return (
@@ -25,6 +28,14 @@ export function App() {
           }
         />
         <Route
+          path="checkout"
+          element={<RotaProtegida><CheckoutPage /></RotaProtegida>}
+        />
+        <Route
+          path="pedidos/:id"
+          element={<RotaProtegida><PedidoDetalhePage /></RotaProtegida>}
+        />
+        <Route
           path="pedidos"
           element={
             <RotaProtegida>
@@ -32,7 +43,7 @@ export function App() {
             </RotaProtegida>
           }
         />
-        <Route path="*" element={<p>Página não encontrada.</p>} />
+        <Route path="*" element={<EstadoPagina titulo="Página não encontrada" texto="Confira o endereço ou volte ao catálogo." />} />
       </Route>
     </Routes>
   );

@@ -74,6 +74,7 @@ export const LivroRepository = {
 
   async listarCategorias(): Promise<string[]> {
     const categorias = await LivroModel.distinct('categorias');
-    return categorias.sort((a, b) => a.localeCompare(b));
+    // filter(Boolean) descarta nulos/vazios que o MongoDB pode retornar
+    return (categorias as string[]).filter(Boolean).sort((a, b) => a.localeCompare(b));
   },
 };

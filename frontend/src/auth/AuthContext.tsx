@@ -18,15 +18,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Se já há token salvo, tenta recuperar o usuário. Token inválido = desloga.
   useEffect(() => {
-    if (!tokenStore.get()) {
+    const token = tokenStore.get();
+    if (!token) {
       setCarregando(false);
       return;
     }
+    let ativa = true;
     authApi
       .me()
-      .then(setUsuario)
-      .catch(() => tokenStore.clear())
-      .finally(() => setCarregando(false));
+      .then((perfil) => { if (ativa && tokenStore.get() === token) setUsuario(perfil); })
+      .catch(() => { if (ativa && tokenStore.get() === token) tokenStore.clear(); })
+      .finally(() => { if (ativa) setCarregando(false); });
+    return () => { ativa = false; };
   }, []);
 
   const entrar = useCallback((sessao: Sessao) => {
