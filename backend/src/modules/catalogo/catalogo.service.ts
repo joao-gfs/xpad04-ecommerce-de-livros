@@ -1,6 +1,14 @@
-import { naoImplementado } from '../../shared/http-error';
+import { HttpError } from '../../shared/http-error';
 import { EstoqueRepository } from './estoque.repository';
 import { LivroRepository, type FiltroLivros } from './livro.repository';
+
+/** 404 quando o livro não existe no catálogo (MongoDB). */
+export class LivroNaoEncontradoError extends HttpError {
+  constructor(id: string) {
+    super(404, `Livro não encontrado: ${id}`);
+    this.name = 'LivroNaoEncontradoError';
+  }
+}
 
 export interface LivroResumo {
   id: string;
@@ -31,18 +39,51 @@ export interface Paginado<T> {
 
 export const CatalogoService = {
   async listarCategorias(): Promise<string[]> {
-    // TODO: LivroRepository.listarCategorias(), ordenado
-    naoImplementado('CatalogoService.listarCategorias');
+    return LivroRepository.listarCategorias();
   },
 
   async listarLivros(filtro: FiltroLivros): Promise<Paginado<LivroResumo>> {
-    // TODO: LivroRepository.listar(filtro) e mapear para LivroResumo (_id -> id)
-    naoImplementado('CatalogoService.listarLivros');
+    const { itens, total } = await LivroRepository.listar(filtro);
+
+    return {
+      itens: itens.map((livro) => ({
+        id: String(livro._id),
+        titulo: livro.titulo,
+        autores: livro.autores ?? [],
+        categorias: livro.categorias ?? [],
+        preco: livro.preco,
+        capaUrl: livro.capaUrl,
+      })),
+      total,
+      pagina: filtro.pagina,
+      porPagina: filtro.porPagina,
+    };
   },
 
-  /** Junta MongoDB (dados do livro) + PostgreSQL (estoque). 404 se o livro não existir. */
+  /** Junta MongoDB (livro) + PostgreSQL (estoque) em paralelo. 404 se não existir. */
   async obterLivro(id: string): Promise<LivroDetalhe> {
-    // TODO: LivroRepository.buscarPorId + EstoqueRepository.obterQuantidade
-    naoImplementado('CatalogoService.obterLivro');
+    const [livro, estoque] = await Promise.all([
+      LivroRepository.buscarPorId(id),
+      EstoqueRepository.obterQuantidade(id),
+    ]);
+
+    if (!livro) throw new LivroNaoEncontradoError(id);
+
+    return {
+      id: String(livro._id),
+      titulo: livro.titulo,
+      autores: livro.autores ?? [],
+      categorias: livro.categorias ?? [],
+      preco: livro.preco,
+      capaUrl: livro.capaUrl,
+      subtitulo: livro.subtitulo,
+      descricao: livro.descricao,
+      editora: livro.editora,
+      dataPublicacao: livro.dataPublicacao,
+      paginas: livro.paginas,
+      isbn: livro.isbn,
+      estoque,
+      disponivel: estoque > 0,
+    };
   },
 };
