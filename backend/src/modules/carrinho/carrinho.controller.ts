@@ -19,16 +19,22 @@ export const CarrinhoController = {
 
   async adicionar(req: Request, res: Response) {
     const { livroId, quantidade } = adicionarBody.parse(req.body);
-    res.status(201).json(await CarrinhoService.adicionarItem(usuarioIdDe(req), livroId, quantidade));
+    const usuarioId = usuarioIdDe(req);
+    await CarrinhoService.adicionarItem(usuarioId, livroId, quantidade);
+    res.status(201).json(await CarrinhoService.obter(usuarioId));
   },
 
   async atualizar(req: Request<{ livroId: string }>, res: Response) {
     const { quantidade } = atualizarBody.parse(req.body);
-    res.json(await CarrinhoService.atualizarQuantidade(usuarioIdDe(req), req.params.livroId, quantidade));
+    const usuarioId = usuarioIdDe(req);
+    await CarrinhoService.atualizarQuantidade(usuarioId, req.params.livroId, quantidade);
+    res.json(await CarrinhoService.obter(usuarioId));
   },
 
   async remover(req: Request<{ livroId: string }>, res: Response) {
-    res.json(await CarrinhoService.removerItem(usuarioIdDe(req), req.params.livroId));
+    const usuarioId = usuarioIdDe(req);
+    await CarrinhoService.removerItem(usuarioId, req.params.livroId);
+    res.json(await CarrinhoService.obter(usuarioId));
   },
 
   async limpar(req: Request, res: Response) {

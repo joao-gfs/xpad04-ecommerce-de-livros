@@ -1,6 +1,5 @@
 import { env } from '../../config/env';
 import { redis } from '../../db/redis';
-import { naoImplementado } from '../../shared/http-error';
 
 /**
  * Carrinho no Redis (chave-valor).
@@ -14,29 +13,39 @@ import { naoImplementado } from '../../shared/http-error';
 export const chaveCarrinho = (usuarioId: number) => `carrinho:${usuarioId}`;
 
 export const CarrinhoRepository = {
-  /** livroId -> quantidade */
+  /** Retorna mapa livroId -> quantidade. Mapa vazio se o carrinho não existir. */
   async obterItens(usuarioId: number): Promise<Map<string, number>> {
-    // TODO: redis.hgetall(chaveCarrinho(usuarioId)) e converter valores para number
-    naoImplementado('CarrinhoRepository.obterItens');
+    const chave = chaveCarrinho(usuarioId);
+    const hash = await redis.hgetall(chave);
+    const mapa = new Map<string, number>();
+    for (const [livroId, qtd] of Object.entries(hash ?? {})) {
+      mapa.set(livroId, Number(qtd));
+    }
+    return mapa;
   },
 
+  /** Define a quantidade exata de um item e renova o TTL. */
   async definirQuantidade(usuarioId: number, livroId: string, quantidade: number): Promise<void> {
-    // TODO: redis.multi().hset(...).expire(chave, env.CARRINHO_TTL_SEGUNDOS).exec()
-    naoImplementado('CarrinhoRepository.definirQuantidade');
+    const chave = chaveCarrinho(usuarioId);
+    await redis.hset(chave, livroId, quantidade);
+    await redis.expire(chave, env.CARRINHO_TTL_SEGUNDOS);
   },
 
+  /** Incrementa (HINCRBY) e renova o TTL. Retorna a nova quantidade. */
   async incrementar(usuarioId: number, livroId: string, quantidade: number): Promise<number> {
-    // TODO: redis.hincrby(...) + expire; retorna a nova quantidade
-    naoImplementado('CarrinhoRepository.incrementar');
+    const chave = chaveCarrinho(usuarioId);
+    const novaQtd = await redis.hincrby(chave, livroId, quantidade);
+    await redis.expire(chave, env.CARRINHO_TTL_SEGUNDOS);
+    return novaQtd;
   },
 
+  /** Remove um campo do hash (HDEL). */
   async removerItem(usuarioId: number, livroId: string): Promise<void> {
-    // TODO: redis.hdel(...)
-    naoImplementado('CarrinhoRepository.removerItem');
+    await redis.hdel(chaveCarrinho(usuarioId), livroId);
   },
 
+  /** Apaga o hash inteiro (DEL). Chamado pelo PedidoService após commit do checkout. */
   async limpar(usuarioId: number): Promise<void> {
-    // TODO: redis.del(...)
-    naoImplementado('CarrinhoRepository.limpar');
+    await redis.del(chaveCarrinho(usuarioId));
   },
 };
