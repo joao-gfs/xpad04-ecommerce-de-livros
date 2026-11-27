@@ -1,5 +1,5 @@
 import { prisma } from '../../db/postgres';
-import { naoImplementado } from '../../shared/http-error';
+import { HttpError } from '../../shared/http-error';
 import { CarrinhoRepository } from '../carrinho/carrinho.repository';
 import { EstoqueRepository } from '../catalogo/estoque.repository';
 import { LivroRepository } from '../catalogo/livro.repository';
@@ -27,6 +27,14 @@ export interface PedidoResposta {
   pagamento: { metodo: MetodoPagamento; valor: number; status: StatusPagamento } | null;
 }
 
+/** Lançado quando o pedido não existe ou não pertence ao usuário. */
+export class PedidoNaoEncontradoError extends HttpError {
+  constructor(pedidoId: number) {
+    super(404, `Pedido não encontrado: ${pedidoId}`);
+    this.name = 'PedidoNaoEncontradoError';
+  }
+}
+
 export const PedidoService = {
   /**
    * Checkout: o fluxo que coordena os três bancos.
@@ -46,16 +54,74 @@ export const PedidoService = {
    * Isso é aceitável e vale citar na apresentação (consistência entre bancos).
    */
   async checkout(usuarioId: number, metodo: MetodoPagamento): Promise<PedidoResposta> {
-    naoImplementado('PedidoService.checkout');
+    // 1. Redis: lê o mapa livroId -> quantidade do carrinho
+    const mapa = await CarrinhoRepository.obterItens(usuarioId);
+    if (mapa.size === 0) throw new HttpError(400, 'O carrinho está vazio.');
+
+    const livroIds = [...mapa.keys()];
+
+    // 2. MongoDB: busca preço atual de cada livro (congela como preco_unitario)
+    const livros = await LivroRepository.buscarPorIds(livroIds);
+    const livroMap = new Map(livros.map((l) => [String(l._id), l]));
+
+    // Itens cujo livro não existe mais no catálogo são descartados (mesmo comportamento do CarrinhoService)
+    const itens = livroIds
+      .filter((id) => livroMap.has(id))
+      .map((id) => ({
+        livroId: id,
+        precoUnitario: livroMap.get(id)!.preco,
+        quantidade: mapa.get(id)!,
+      }));
+
+    if (itens.length === 0) throw new HttpError(400, 'O carrinho está vazio.');
+
+    const total = itens.reduce((soma, i) => soma + i.precoUnitario * i.quantidade, 0);
+
+    // 3. Postgres: transação ACID — baixa de estoque + gravação do pedido
+    const pedido = await prisma.$transaction(async (tx) => {
+      for (const item of itens) {
+        const ok = await EstoqueRepository.decrementar(tx, item.livroId, item.quantidade);
+        if (!ok) {
+          // Lançar dentro do callback faz ROLLBACK de tudo automaticamente.
+          const titulo = livroMap.get(item.livroId)?.titulo ?? item.livroId;
+          throw new HttpError(409, `Estoque insuficiente: ${titulo}`);
+        }
+      }
+
+      return PedidoRepository.criar(tx, {
+        usuarioId,
+        status: 'CONFIRMADO',
+        total,
+        itens,
+        pagamento: { metodo, valor: total, status: 'APROVADO' },
+      });
+    });
+
+    // 4. Redis: limpa o carrinho SÓ depois do COMMIT confirmado.
+    await CarrinhoRepository.limpar(usuarioId);
+    return paraResposta(pedido, livroMap);
   },
 
   async listarDoUsuario(usuarioId: number): Promise<PedidoResposta[]> {
-    naoImplementado('PedidoService.listarDoUsuario');
+    const pedidos = await PedidoRepository.listarPorUsuario(usuarioId);
+    if (pedidos.length === 0) return [];
+
+    // Busca todos os livros referenciados de uma vez (evita N+1).
+    const todosLivroIds = [...new Set(pedidos.flatMap((p) => p.itens.map((i) => i.livroId)))];
+    const livros = await LivroRepository.buscarPorIds(todosLivroIds);
+    const livroMap = new Map(livros.map((l) => [String(l._id), l]));
+
+    return pedidos.map((p) => paraResposta(p, livroMap));
   },
 
   /** 404 se não existir ou se for de outro usuário. */
   async obter(usuarioId: number, pedidoId: number): Promise<PedidoResposta> {
-    naoImplementado('PedidoService.obter');
+    const pedido = await PedidoRepository.buscarPorId(pedidoId);
+    if (!pedido || pedido.usuarioId !== usuarioId) throw new PedidoNaoEncontradoError(pedidoId);
+
+    const livros = await LivroRepository.buscarPorIds(pedido.itens.map((i) => i.livroId));
+    const livroMap = new Map(livros.map((l) => [String(l._id), l]));
+    return paraResposta(pedido, livroMap);
   },
 };
 

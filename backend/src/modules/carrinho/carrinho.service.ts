@@ -84,7 +84,7 @@ export const CarrinhoService = {
 
     const qtdNoCarrinho = mapaAtual.get(livroId) ?? 0;
     if (qtdNoCarrinho + quantidade > estoqueDisponivel) {
-      throw new EstoqueInsuficienteError(livroId, estoqueDisponivel - qtdNoCarrinho);
+      throw new EstoqueInsuficienteError(livroId, Math.max(0, estoqueDisponivel - qtdNoCarrinho));
     }
 
     await CarrinhoRepository.incrementar(usuarioId, livroId, quantidade);
