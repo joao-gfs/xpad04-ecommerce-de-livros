@@ -19,6 +19,7 @@ const livroSchema = new Schema(
     idioma: String,
     capaUrl: String,
     preco: { type: Number, required: true, min: 0 },
+    precoOrigem: { type: String, enum: ['api', 'sintetico'], required: true, default: 'sintetico' },
   },
   { timestamps: true, versionKey: false },
 );
