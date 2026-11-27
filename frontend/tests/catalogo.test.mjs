@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { consultarCatalogo } from '../src/catalogo/consulta.ts';
-import { lerFiltros, lerModoCatalogo, mudarFiltro } from '../src/catalogo/filtros.ts';
+import { lerFiltros, lerModoCatalogo, mudarFiltro, mudarFiltrosAdicionais, validarFiltrosAdicionais } from '../src/catalogo/filtros.ts';
 import { listarCategoriasDemonstracao, listarLivrosDemonstracao, obterLivroDemonstracao } from '../src/mocks/catalogo.ts';
 
 const listar = (filtro = {}) => listarLivrosDemonstracao({ busca: '', categoria: '', pagina: 1, porPagina: 6, ...filtro });
@@ -53,6 +53,47 @@ test('limpar a busca remove o parâmetro sem remover a categoria', () => {
   assert.equal(lerFiltros(parametros).pagina, 1);
 });
 
+const camposVazios = { descricao: '', editora: '', precoMin: '', precoMax: '' };
+
+test('preços opcionais preservam zero e convertem moeda para números', () => {
+  assert.deepEqual(validarFiltrosAdicionais(camposVazios), { filtros: {}, erros: {} });
+  assert.deepEqual(validarFiltrosAdicionais({ ...camposVazios, precoMin: '0', precoMax: 'R$ 1.234,50' }), {
+    filtros: { precoMin: 0, precoMax: 1234.5 }, erros: {},
+  });
+  assert.equal(validarFiltrosAdicionais({ ...camposVazios, precoMax: '39.90' }).filtros.precoMax, 39.9);
+});
+
+test('preços negativos, inválidos e intervalos invertidos têm erro no campo correspondente', () => {
+  for (const precoMin of ['-1', 'abc', '1e2', '39,9,0', 'Infinity']) {
+    assert.ok(validarFiltrosAdicionais({ ...camposVazios, precoMin }).erros.precoMin);
+  }
+  assert.ok(validarFiltrosAdicionais({ ...camposVazios, precoMin: '50', precoMax: '25' }).erros.precoMax);
+  assert.deepEqual(validarFiltrosAdicionais({ ...camposVazios, precoMin: '39,90', precoMax: '39.90' }).erros, {});
+});
+
+test('aplicar e limpar os filtros adicionais retorna à página 1 e preserva busca e categoria', () => {
+  const original = new URLSearchParams({ busca: 'Machado', categoria: 'Romance', pagina: '3' });
+  const aplicado = mudarFiltrosAdicionais(original, { descricao: 'Capitu', editora: 'Companhia', precoMin: 0, precoMax: 40 });
+  assert.equal(aplicado.get('precoMin'), '0');
+  assert.equal(aplicado.has('pagina'), false);
+  const segundaPagina = mudarFiltro(aplicado, 'pagina', '2');
+  assert.deepEqual(lerFiltros(segundaPagina), {
+    busca: 'Machado', categoria: 'Romance', pagina: 2, porPagina: 6,
+    descricao: 'Capitu', editora: 'Companhia', precoMin: 0, precoMax: 40,
+  });
+  const limpo = mudarFiltrosAdicionais(segundaPagina, {});
+  assert.deepEqual(Object.fromEntries(limpo), { busca: 'Machado', categoria: 'Romance' });
+  assert.equal(original.get('pagina'), '3');
+});
+
+test('preços inválidos em endereços digitados manualmente ficam fora da consulta', () => {
+  assert.equal(lerFiltros(new URLSearchParams('precoMin=-1')).precoMin, undefined);
+  assert.equal(lerFiltros(new URLSearchParams('precoMax=')).precoMax, undefined);
+  const invertido = lerFiltros(new URLSearchParams('precoMin=50&precoMax=25'));
+  assert.equal(invertido.precoMin, undefined);
+  assert.equal(invertido.precoMax, undefined);
+});
+
 test('a demonstração busca por título ou autor, ignorando caixa e acentos', () => {
   const porTitulo = listar({ busca: 'pequeno principe' });
   assert.equal(porTitulo.total, 1);
@@ -68,6 +109,28 @@ test('categoria e busca atuam juntas, inclusive quando não há correspondência
   assert.ok(encontrados.itens.every((livro) => livro.categorias.includes('Ficção') && livro.autores.includes('George Orwell')));
   assert.deepEqual(listar({ busca: 'George Orwell', categoria: 'Romance' }).itens, []);
   assert.equal(listar({ busca: 'George Orwell', categoria: 'Romance' }).total, 0);
+});
+
+test('descrição e editora filtram metadados, inclusive quando aplicadas com outros critérios', () => {
+  assert.deepEqual(listar({ descricao: 'capitu' }).itens.map((livro) => livro.titulo), ['Dom Casmurro']);
+  assert.deepEqual(listar({ editora: 'harper' }).itens.map((livro) => livro.titulo), ['O Hobbit']);
+  const criterios = { categoria: 'Romance', busca: 'Machado', descricao: 'Capitu', editora: 'Companhia', precoMin: 35, precoMax: 40 };
+  assert.deepEqual(listar(criterios).itens.map((livro) => livro.titulo), ['Dom Casmurro']);
+  assert.equal(listar({ ...criterios, precoMax: 38 }).total, 0);
+});
+
+test('limites inclusivos são aplicados antes da contagem e da paginação da demonstração', () => {
+  const min = listar({ precoMin: 49.9, porPagina: 100 });
+  assert.ok(min.itens.some((livro) => livro.preco === 49.9));
+  assert.ok(min.itens.every((livro) => livro.preco >= 49.9));
+  const primeira = listar({ precoMax: 49.9 });
+  const segunda = listar({ precoMax: 49.9, pagina: 2 });
+  const itens = [...primeira.itens, ...segunda.itens];
+  assert.ok(segunda.itens.length > 0);
+  assert.equal(segunda.total, primeira.total);
+  assert.equal(new Set(itens.map((livro) => livro.id)).size, primeira.total);
+  assert.ok(itens.some((livro) => livro.preco === 49.9));
+  assert.ok(itens.every((livro) => livro.preco <= 49.9));
 });
 
 test('paginação tem total consistente e não repete livros entre páginas', () => {
@@ -122,8 +185,11 @@ function prepararConsulta(t, categorias, livros) {
   return { api, demo };
 }
 
-test('consulta real recebe busca, categoria e página e usa a paginação da API', async (t) => {
-  const params = new URLSearchParams({ busca: '  Uma história  ', categoria: 'Ficção', pagina: '2' });
+test('consulta real recebe todos os critérios e usa o total e a página da API', async (t) => {
+  const params = new URLSearchParams({
+    busca: '  Uma história  ', categoria: 'Ficção', descricao: ' Aventura ',
+    editora: ' Editora de teste ', precoMin: '0', precoMax: '35,90', pagina: '2',
+  });
   const filtros = lerFiltros(params);
   const paginaApi = {
     itens: [{ id: 'livro-api', titulo: 'Uma história', autores: ['Autora'], categorias: ['Ficção'], preco: 35 }],
@@ -133,7 +199,10 @@ test('consulta real recebe busca, categoria e página e usa a paginação da API
 
   const resultado = await consultarCatalogo(api, filtros, lerModoCatalogo(true, 'true'), demo);
 
-  assert.deepEqual(api.livros.mock.calls[0].arguments, [{ busca: 'Uma história', categoria: 'Ficção', pagina: 2, porPagina: 6 }]);
+  assert.deepEqual(api.livros.mock.calls[0].arguments, [{
+    busca: 'Uma história', categoria: 'Ficção', descricao: 'Aventura',
+    editora: 'Editora de teste', precoMin: 0, precoMax: 35.9, pagina: 2, porPagina: 6,
+  }]);
   assert.equal(api.categorias.mock.callCount(), 1);
   assert.equal(resultado.origem, 'api');
   assert.deepEqual(resultado.livros.dados, paginaApi);

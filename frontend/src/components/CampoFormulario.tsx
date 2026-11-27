@@ -17,8 +17,8 @@ export function CampoFormulario({ rotulo, erro, dica, type, ...input }: CampoPro
           {...input}
           id={id}
           type={senha && mostrar ? 'text' : type}
-          aria-invalid={Boolean(erro)}
-          aria-describedby={erro ? `${id}-erro` : dica ? `${id}-dica` : undefined}
+          aria-invalid={Boolean(erro) || (input['aria-invalid'] ?? false)}
+          aria-describedby={erro ? `${id}-erro` : dica ? `${id}-dica` : input['aria-describedby']}
         />
         {senha && (
           <button type="button" className="alternar-senha" aria-label={acaoSenha} onClick={() => setMostrar((valor) => !valor)}>

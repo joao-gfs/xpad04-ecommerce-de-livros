@@ -25,9 +25,15 @@ export function listarCategoriasDemonstracao(): string[] {
 
 export function listarLivrosDemonstracao(filtro: FiltrosCatalogo): Paginado<LivroResumo> {
   const busca = normalizar(filtro.busca);
+  const descricao = normalizar(filtro.descricao ?? '');
+  const editora = normalizar(filtro.editora ?? '');
   const filtrados = livrosDemonstracao.filter((livro) =>
     (!filtro.categoria || livro.categorias.includes(filtro.categoria)) &&
-    (!busca || normalizar([livro.titulo, ...livro.autores].join(' ')).includes(busca)),
+    (!busca || [livro.titulo, ...livro.autores].some((texto) => normalizar(texto).includes(busca))) &&
+    (!descricao || normalizar(sinopses[livro.id] ?? '').includes(descricao)) &&
+    (!editora || normalizar(editoras[livro.id] ?? '').includes(editora)) &&
+    (filtro.precoMin === undefined || livro.preco >= filtro.precoMin) &&
+    (filtro.precoMax === undefined || livro.preco <= filtro.precoMax),
   );
   const inicio = (filtro.pagina - 1) * filtro.porPagina;
   return { itens: filtrados.slice(inicio, inicio + filtro.porPagina), total: filtrados.length, pagina: filtro.pagina, porPagina: filtro.porPagina };
@@ -48,9 +54,16 @@ const sinopses: Record<string, string> = {
   'demo-brasil': 'Um panorama da história política e social do Brasil, da colonização ao período republicano.',
 };
 
+const editoras: Record<string, string> = {
+  'demo-dom-casmurro': 'Companhia das Letras',
+  'demo-memorias': 'Companhia das Letras',
+  'demo-1984': 'Companhia das Letras',
+  'demo-hobbit': 'HarperCollins',
+};
+
 export function obterLivroDemonstracao(id: string): LivroDetalhe | null {
   const livro = livrosDemonstracao.find((item) => item.id === id);
   if (!livro) return null;
   const estoque = livro.id === 'demo-frankenstein' ? 0 : 8;
-  return { ...livro, descricao: sinopses[id], estoque, disponivel: estoque > 0 };
+  return { ...livro, descricao: sinopses[id], editora: editoras[id], estoque, disponivel: estoque > 0 };
 }

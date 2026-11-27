@@ -1,6 +1,7 @@
 import { api } from './client';
 import type {
   Carrinho,
+  FiltroLivrosApi,
   Health,
   LivroDetalhe,
   LivroResumo,
@@ -23,7 +24,7 @@ export const authApi = {
 
 export const catalogoApi = {
   categorias: () => api<string[]>('/categorias'),
-  livros: (filtro: { categoria?: string; busca?: string; pagina?: number; porPagina?: number } = {}) => {
+  livros: (filtro: FiltroLivrosApi = {}) => {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(filtro)) if (v !== undefined && v !== '') qs.set(k, String(v));
     return api<Paginado<LivroResumo>>(`/livros?${qs}`);
