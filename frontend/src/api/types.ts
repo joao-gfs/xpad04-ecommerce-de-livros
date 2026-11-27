@@ -1,6 +1,19 @@
 // Espelho dos contratos da API (backend/src/modules/*/*.service.ts).
 // Mudou lá, muda aqui.
 
+export interface FiltroLivrosApi {
+  categoria?: string;
+  busca?: string;
+  autor?: string;
+  titulo?: string;
+  descricao?: string;
+  editora?: string;
+  precoMin?: number;
+  precoMax?: number;
+  pagina?: number;
+  porPagina?: number;
+}
+
 export interface Paginado<T> {
   itens: T[];
   total: number;

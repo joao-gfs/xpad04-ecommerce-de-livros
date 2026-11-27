@@ -6,11 +6,12 @@ import { mensagemApi } from '../api/erros';
 import { useAuth } from '../auth/AuthContext';
 import { useCarrinho } from '../carrinho/CarrinhoContext';
 import { consultarCatalogo, type CarregarDemonstracao, type CatalogoConsultado } from '../catalogo/consulta';
-import { lerFiltros, mudarFiltro } from '../catalogo/filtros';
+import { lerFiltros, mudarFiltro, mudarFiltrosAdicionais, type FiltrosAdicionais } from '../catalogo/filtros';
 import { FiltroCategorias } from '../components/FiltroCategorias';
 import { Icone } from '../components/Icone';
 import { LivroCard } from '../components/LivroCard';
 import { Paginacao } from '../components/Paginacao';
+import { PainelFiltros } from '../components/PainelFiltros';
 import { modoCatalogo } from '../config/desenvolvimento';
 
 const carregarDemonstracao: CarregarDemonstracao | undefined = import.meta.env.DEV ? async (filtros) => {
@@ -23,10 +24,12 @@ const carregarDemonstracao: CarregarDemonstracao | undefined = import.meta.env.D
 
 export function CatalogoPage() {
   const [params, setParams] = useSearchParams();
-  const { busca, categoria, pagina, porPagina } = lerFiltros(params);
+  const { busca, categoria, descricao, editora, precoMin, precoMax, pagina, porPagina } = lerFiltros(params);
+  const adicionais = useMemo(() => ({ descricao, editora, precoMin, precoMax }), [descricao, editora, precoMin, precoMax]);
+  const temFiltros = Boolean(busca || categoria || descricao || editora || precoMin !== undefined || precoMax !== undefined);
   const [tentativa, setTentativa] = useState(0);
-  const consulta = useMemo(() => ({ filtros: { busca, categoria, pagina, porPagina }, tentativa }),
-    [busca, categoria, pagina, porPagina, tentativa]);
+  const consulta = useMemo(() => ({ filtros: { busca, categoria, ...adicionais, pagina, porPagina }, tentativa }),
+    [busca, categoria, adicionais, pagina, porPagina, tentativa]);
   const [resposta, setResposta] = useState<{ consulta: typeof consulta; resultado: CatalogoConsultado } | null>(null);
   const [alterando, setAlterando] = useState<string | null>(null);
   const [erroCarrinho, setErroCarrinho] = useState('');
@@ -69,13 +72,16 @@ export function CatalogoPage() {
     setParams((atual) => mudarFiltro(atual, chave, valor));
   }
 
-  function limparFiltros() {
+  function aplicarAdicionais(filtros: FiltrosAdicionais) {
+    setParams((atual) => mudarFiltrosAdicionais(atual, filtros));
+    tentarNovamente();
+  }
+
+  function limparTodosFiltros() {
     setParams((atual) => {
-      const proximo = new URLSearchParams(atual);
+      const proximo = mudarFiltrosAdicionais(atual, {});
       proximo.delete('busca');
       proximo.delete('categoria');
-      proximo.delete('pagina');
-      proximo.delete('modo');
       return proximo;
     });
   }
@@ -133,14 +139,17 @@ export function CatalogoPage() {
       )}
 
       <div className="catalogo-layout" id="catalogo">
-        <FiltroCategorias
-          categorias={anterior?.categorias.dados ?? []}
-          selecionada={categoria}
-          carregando={carregando && !anterior?.categorias.dados}
-          erro={erroCategorias}
-          onSelecionar={(valor) => filtrar('categoria', valor)}
-          onTentarNovamente={tentarNovamente}
-        />
+        <div className="catalogo-lateral">
+          <FiltroCategorias
+            categorias={anterior?.categorias.dados ?? []}
+            selecionada={categoria}
+            carregando={carregando && !anterior?.categorias.dados}
+            erro={erroCategorias}
+            onSelecionar={(valor) => filtrar('categoria', valor)}
+            onTentarNovamente={tentarNovamente}
+          />
+          <PainelFiltros aplicados={adicionais} onAplicar={aplicarAdicionais} />
+        </div>
         <section className="catalogo-resultados" aria-labelledby="titulo-catalogo" aria-busy={carregando}>
           <div className="catalogo-cabecalho">
             <div><span className="sobretitulo">NA SUA ESTANTE, EM BREVE</span><h2 id="titulo-catalogo">{busca ? 'Resultados da busca' : categoria || 'Catálogo de livros'}</h2></div>
@@ -150,7 +159,7 @@ export function CatalogoPage() {
           {(busca || categoria) && <div className="filtros-ativos">
             {busca && <button onClick={() => filtrar('busca', '')} aria-label={'Remover busca ' + busca}>Busca: {busca}<Icone nome="fechar" /></button>}
             {categoria && <button onClick={() => filtrar('categoria', '')} aria-label={'Remover categoria ' + categoria}>{categoria}<Icone nome="fechar" /></button>}
-            <button className="limpar-filtros" onClick={limparFiltros}>Limpar filtros</button>
+            <button className="limpar-filtros" onClick={limparTodosFiltros}>Limpar todos os filtros</button>
           </div>}
 
           {erroCarrinho && (
@@ -182,7 +191,15 @@ export function CatalogoPage() {
                   ))}
                 </div>
                 <div className="catalogo-paginacao"><span>Mostrando {primeiraPosicao}–{primeiraPosicao + dados.itens.length - 1} de {dados.total} livros</span><Paginacao pagina={dados.pagina} totalPaginas={totalPaginas} onMudar={(valor) => filtrar('pagina', String(valor))} /></div>
-              </> : <div className="estado-catalogo"><Icone nome="busca" /><h3>{pagina > 1 ? 'Não há livros nesta página' : 'Nenhum livro encontrado'}</h3><p>{busca || categoria ? 'Experimente outro título, autor ou categoria.' : 'Novas histórias aparecerão aqui quando o catálogo estiver disponível.'}</p>{pagina > 1 ? <button className="botao" onClick={() => filtrar('pagina', '1')}>Voltar à primeira página</button> : (busca || categoria) && <button className="botao" onClick={limparFiltros}>Limpar filtros</button>}</div>}
+              </> : (
+                <div className="estado-catalogo">
+                  <Icone nome="busca" />
+                  <h3>{pagina > 1 ? 'Não há livros nesta página' : 'Nenhum livro encontrado'}</h3>
+                  <p>{temFiltros ? 'Experimente alterar a busca ou os filtros para encontrar outros livros.' : 'Novas histórias aparecerão aqui quando o catálogo estiver disponível.'}</p>
+                  {pagina > 1 ? <button type="button" className="botao" onClick={() => filtrar('pagina', '1')}>Voltar à primeira página</button>
+                    : temFiltros && <button type="button" className="botao" onClick={limparTodosFiltros}>Limpar todos os filtros</button>}
+                </div>
+              )}
         </section>
       </div>
     </div>
