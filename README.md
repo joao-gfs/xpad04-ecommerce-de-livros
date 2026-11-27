@@ -42,6 +42,7 @@ docker compose exec api npm run ingest -- 20  # menos livros
 
 Pode rodar de novo quando quiser: faz upsert no catálogo e não mexe no estoque de livros que já existem.
 O estoque inicial é aleatório (0 a 25, ~10% zerado para testar "indisponível").
+O preço sintético é `R$ 10 + R$ 0,05 × páginas + R$ 0,50 × max(0, ano − 2000)`; sem páginas, usa 200, e sem ano válido, 2000. O catálogo marca esses valores com `precoOrigem: "sintetico"`.
 
 ### Ver os dados nos bancos
 
